@@ -4,8 +4,6 @@ import pandas as pd
 import numpy as np
 import joblib
 import os
-from datetime import datetime
-from pymongo import MongoClient
 
 
 app = Flask(__name__)
@@ -72,22 +70,6 @@ model_features = joblib.load(
         "model_features.pkl"
     )
 )
-
-
-# -------------------------------------------------
-# MongoDB connection
-# -------------------------------------------------
-
-MONGO_URI = os.environ.get(
-    "MONGO_URI",
-    "mongodb+srv://2403717620522007_db_user:PFmfqoMhDMxMsAY2@cluster0.ohomtdx.mongodb.net/?appName=Cluster0"
-)
-
-mongo_client = MongoClient(MONGO_URI)
-
-db = mongo_client["air_quality_db"]
-
-predictions_collection = db["predictions"]
 
 
 def prepare_data(data):
@@ -259,23 +241,11 @@ def home():
 @app.route("/health", methods=["GET"])
 def health():
 
-    mongo_status = "connected"
-
-    try:
-
-        mongo_client.admin.command("ping")
-
-    except Exception:
-
-        mongo_status = "disconnected"
-
     return jsonify({
 
         "success": True,
 
-        "status": "healthy",
-
-        "mongodb": mongo_status
+        "status": "healthy"
 
     })
 
@@ -449,23 +419,6 @@ def predict():
                 )
 
         }
-
-
-        # Save prediction to MongoDB
-
-        try:
-
-            log_entry = dict(result)
-
-            log_entry["input"] = data
-
-            log_entry["timestamp"] = datetime.utcnow()
-
-            predictions_collection.insert_one(log_entry)
-
-        except Exception as db_error:
-
-            print(f"MongoDB insert failed: {db_error}")
 
 
         return jsonify(result)
@@ -662,51 +615,6 @@ def feature_extraction():
 
         })
 
-
-    except Exception as e:
-
-        return jsonify({
-
-            "success": False,
-
-            "error": str(e)
-
-        }), 400
-
-
-@app.route("/history", methods=["GET"])
-def get_history():
-
-    try:
-
-        limit = int(request.args.get("limit", 20))
-
-        records = list(
-
-            predictions_collection.find(
-                {},
-                {"_id": 0}
-            ).sort(
-                "timestamp", -1
-            ).limit(limit)
-
-        )
-
-        for record in records:
-
-            if "timestamp" in record and isinstance(record["timestamp"], datetime):
-
-                record["timestamp"] = record["timestamp"].isoformat()
-
-        return jsonify({
-
-            "success": True,
-
-            "count": len(records),
-
-            "history": records
-
-        })
 
     except Exception as e:
 
